@@ -1,10 +1,18 @@
 import { db } from "@/lib/db";
-import client from "@/lib/elasticsearch";
 import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 
 // POST handler for indexing products and variants to Elasticsearch
 export async function POST() {
   try {
+    const { default: client } = await import("@/lib/elasticsearch");
+    if (!client) {
+      return NextResponse.json(
+        { message: "Elasticsearch is not configured" },
+        { status: 503 }
+      );
+    }
     // Delete all indices
     await client.indices.delete({ index: "_all" });
 
