@@ -3,6 +3,11 @@ import { NextResponse } from "next/server";
 import { getUserCountry } from "./lib/utils";
 
 export default clerkMiddleware(async (auth, req, next) => {
+  // Webhooks must bypass middleware (no cookies, would get 307 redirect)
+  if (req.nextUrl.pathname === "/api/webhooks") {
+    return NextResponse.next();
+  }
+
   const protectedRoutes = createRouteMatcher([
     "/dashboard",
     "/dashboard/(.*)",
