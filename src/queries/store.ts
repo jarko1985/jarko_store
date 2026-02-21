@@ -41,7 +41,7 @@ export const upsertStore = async (
     if (!user) throw new Error("Unauthenticated.");
 
     // Verify seller permission
-    if (user.privateMetadata.role !== "SELLER")
+    if (user.publicMetadata.role !== "SELLER")
       throw new Error(
         "Unauthorized Access: Seller Privileges Required for Entry."
       );
@@ -174,7 +174,7 @@ export const updateStoreDefaultShippingDetails = async (
     if (!user) throw new Error("Unauthenticated.");
 
     // Verify seller permission
-    if (user.privateMetadata.role !== "SELLER")
+    if (user.publicMetadata.role !== "SELLER")
       throw new Error(
         "Unauthorized Access: Seller Privileges Required for Entry."
       );
@@ -232,7 +232,7 @@ export const getStoreShippingRates = async (storeUrl: string) => {
     if (!user) throw new Error("Unauthenticated.");
 
     // Verify seller permission
-    if (user.privateMetadata.role !== "SELLER")
+    if (user.publicMetadata.role !== "SELLER")
       throw new Error(
         "Unauthorized Access: Seller Privileges Required for Entry."
       );
@@ -313,7 +313,7 @@ export const upsertShippingRate = async (
     if (!user) throw new Error("Unauthenticated.");
 
     // Verify seller permission
-    if (user.privateMetadata.role !== "SELLER")
+    if (user.publicMetadata.role !== "SELLER")
       throw new Error(
         "Unauthorized Access: Seller Privileges Required for Entry."
       );
@@ -381,7 +381,7 @@ export const getStoreOrders = async (storeUrl: string) => {
     if (!user) throw new Error("Unauthenticated.");
 
     // Verify seller permission
-    if (user.privateMetadata.role !== "SELLER")
+    if (user.publicMetadata.role !== "SELLER")
       throw new Error(
         "Unauthorized Access: Seller Privileges Required for Entry."
       );
@@ -513,7 +513,7 @@ export const getAllStores = async () => {
     if (!user) throw new Error("Unauthenticated.");
 
     // Verify admin permission
-    if (user.privateMetadata.role !== "ADMIN") {
+    if (user.publicMetadata.role !== "ADMIN") {
       throw new Error(
         "Unauthorized Access: Admin Privileges Required to View Stores."
       );
@@ -547,7 +547,7 @@ export const updateStoreStatus = async (
   if (!user) throw new Error("Unauthenticated.");
 
   // Verify admin permission
-  if (user.privateMetadata.role !== "ADMIN")
+  if (user.publicMetadata.role !== "ADMIN")
     throw new Error(
       "Unauthorized Access: Admin Privileges Required for Entry."
     );
@@ -603,7 +603,7 @@ export const deleteStore = async (storeId: string) => {
     if (!user) throw new Error("Unauthenticated.");
 
     // Verify admin permission
-    if (user.privateMetadata.role !== "ADMIN")
+    if (user.publicMetadata.role !== "ADMIN")
       throw new Error(
         "Unauthorized Access: Admin Privileges Required for Entry."
       );

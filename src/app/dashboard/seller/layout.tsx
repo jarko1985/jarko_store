@@ -12,6 +12,6 @@ export default async function SellerDashboardLayout({
   // Block non sellers from accessing the seller dashboard
   const user = await currentUser();
 
-  if (user?.privateMetadata.role !== "SELLER") redirect("/");
+  if (user?.publicMetadata.role !== "SELLER") redirect("/");
   return <div>{children}</div>;
 }

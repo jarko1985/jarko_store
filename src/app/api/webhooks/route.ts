@@ -106,7 +106,7 @@ export async function POST(req: Request) {
       });
 
       await clerkClient.users.updateUserMetadata(data.id, {
-        privateMetadata: { role: dbUser.role },
+        publicMetadata: { role: dbUser.role },
       });
     } catch (err) {
       console.error("Webhook user.created/updated error:", err);

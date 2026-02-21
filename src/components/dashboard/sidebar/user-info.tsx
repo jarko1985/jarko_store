@@ -5,7 +5,7 @@ import { User } from "@clerk/nextjs/server";
 import React, { useReducer } from "react";
 
 export default function UserInfo({ user }: { user: User | null }) {
-  const role = user?.privateMetadata.role?.toString();
+  const role = user?.publicMetadata.role?.toString();
   return (
     <div>
       <div>
