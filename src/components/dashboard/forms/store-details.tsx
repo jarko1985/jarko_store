@@ -106,7 +106,7 @@ const StoreDetails: FC<StoreDetailsProps> = ({ data }) => {
         logo: values.logo[0].url,
         cover: values.cover[0].url,
         url: values.url,
-        featured: values.featured,
+        featured: values.featured ?? false,
         createdAt: new Date(),
         updatedAt: new Date(),
       });

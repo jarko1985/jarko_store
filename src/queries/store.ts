@@ -21,7 +21,18 @@ import { ShippingRate, Store } from "@prisma/client";
 // Parameters:
 //   - store: Partial store object containing details of the store to be upserted.
 // Returns: Updated or newly created store details.
-export const upsertStore = async (store: Store) => {
+export const upsertStore = async (
+  store: Partial<Store> & {
+    id: string;
+    name: string;
+    description: string;
+    email: string;
+    phone: string;
+    logo: string;
+    cover: string;
+    url: string;
+  }
+) => {
   try {
     // Get current user
     const user = await currentUser();
@@ -82,6 +93,18 @@ export const upsertStore = async (store: Store) => {
       update: store,
       create: {
         ...store,
+        status: store.status ?? StoreStatus.PENDING,
+        averageRating: store.averageRating ?? 0,
+        numReviews: store.numReviews ?? 0,
+        featured: store.featured ?? false,
+        returnPolicy: store.returnPolicy ?? "Return in 30 days.",
+        defaultShippingService: store.defaultShippingService ?? "International Delivery",
+        defaultShippingFeePerItem: store.defaultShippingFeePerItem ?? 0,
+        defaultShippingFeeForAdditionalItem: store.defaultShippingFeeForAdditionalItem ?? 0,
+        defaultShippingFeePerKg: store.defaultShippingFeePerKg ?? 0,
+        defaultShippingFeeFixed: store.defaultShippingFeeFixed ?? 0,
+        defaultDeliveryTimeMin: store.defaultDeliveryTimeMin ?? 7,
+        defaultDeliveryTimeMax: store.defaultDeliveryTimeMax ?? 31,
         user: {
           connect: { id: user.id },
         },

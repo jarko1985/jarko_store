@@ -282,6 +282,7 @@ export const getProductVariant = async (
           images: true,
           colors: {
             select: {
+              id: true,
               name: true,
             },
           },
@@ -311,7 +312,10 @@ export const getProductVariant = async (
     isSale: product.variants[0].isSale,
     brand: product.brand,
     sku: product.variants[0].sku,
-    colors: product.variants[0].colors,
+    colors: product.variants[0].colors.map((c) => ({
+      id: c.id,
+      color: c.name,
+    })),
     sizes: product.variants[0].sizes,
     keywords: product.variants[0].keywords.split(","),
   };

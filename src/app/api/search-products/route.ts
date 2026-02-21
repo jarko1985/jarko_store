@@ -20,6 +20,12 @@ export async function GET(req: Request) {
   }
 
   try {
+    if (!client) {
+      return NextResponse.json(
+        { message: "Search is not configured" },
+        { status: 503 }
+      );
+    }
     const response = await client.search<{ _source: Product }>({
       index: "products",
       body: {
