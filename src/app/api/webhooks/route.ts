@@ -53,42 +53,67 @@ export async function POST(req: Request) {
   }
   // When user is created or updated
   if (evt.type === "user.created" || evt.type === "user.updated") {
-    // Parse the incoming event data
-    const data = JSON.parse(body).data;
+    try {
+      const data = JSON.parse(body).data as {
+        id: string;
+        first_name?: string | null;
+        last_name?: string | null;
+        primary_email_address_id?: string;
+        image_url?: string | null;
+        profile_image_url?: string | null;
+        email_addresses?: Array<{ id: string; email_address: string }>;
+      };
 
-    // Create a user object with relevant properties
-    const user: Partial<User> = {
-      id: data.id,
-      name: `${data.first_name} ${data.last_name}`,
-      email: data.email_addresses[0].email_address,
-      picture: data.image_url,
-    };
-    // If user data is invalid, exit the function
-    if (!user) return;
+      // Resolve primary email (use primary_email_address_id when available)
+      const primaryEmail =
+        data.email_addresses?.find(
+          (e) => e.id === data.primary_email_address_id
+        ) ?? data.email_addresses?.[0];
+      const email = primaryEmail?.email_address;
 
-    // Upsert user in the database (update if exists, create if not)
-    const { db } = await import("@/lib/db");
-    const { clerkClient } = await import("@clerk/nextjs/server");
-    const dbUser = await db.user.upsert({
-      where: {
-        email: user.email,
-      },
-      update: user,
-      create: {
-        id: user.id!,
-        name: user.name!,
-        email: user.email!,
-        picture: user.picture!,
-        role: user.role || "USER", // Default role to "USER" if not provided
-      },
-    });
+      if (!email) {
+        console.error("Webhook: No email found for user", data.id);
+        return new Response("Missing email", { status: 400 });
+      }
 
-    // Update user's metadata in Clerk with the role information
-    await clerkClient.users.updateUserMetadata(data.id, {
-      privateMetadata: {
-        role: dbUser.role || "USER", // Default role to "USER" if not present in dbUser
-      },
-    });
+      const name = [data.first_name, data.last_name]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+      const picture =
+        data.image_url || data.profile_image_url || "https://www.gravatar.com/avatar?d=mp";
+
+      const user: Partial<User> = {
+        id: data.id,
+        name: name || email,
+        email,
+        picture,
+      };
+
+      const { db } = await import("@/lib/db");
+      const { clerkClient } = await import("@clerk/nextjs/server");
+
+      const dbUser = await db.user.upsert({
+        where: { email },
+        update: user,
+        create: {
+          id: data.id,
+          name: user.name!,
+          email,
+          picture,
+          role: "USER",
+        },
+      });
+
+      await clerkClient.users.updateUserMetadata(data.id, {
+        privateMetadata: { role: dbUser.role },
+      });
+    } catch (err) {
+      console.error("Webhook user.created/updated error:", err);
+      return new Response("Internal error processing webhook", {
+        status: 500,
+      });
+    }
   }
 
   // When user is deleted
