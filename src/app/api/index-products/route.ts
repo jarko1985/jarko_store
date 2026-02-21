@@ -1,4 +1,3 @@
-import { db } from "@/lib/db";
 import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +16,7 @@ export async function POST() {
     await client.indices.delete({ index: "_all" });
 
     // Fetch products and their variants from the database using Prisma
+    const { db } = await import("@/lib/db");
     const products = await db.product.findMany({
       include: {
         variants: {
