@@ -1,6 +1,8 @@
 import WishlistContainer from "@/components/store/profile/wishlist/container";
 import { getUserWishlist } from "@/queries/profile";
 
+export const dynamic = "force-dynamic";
+
 export default async function ProfileWishlistPage({
   params,
 }: {

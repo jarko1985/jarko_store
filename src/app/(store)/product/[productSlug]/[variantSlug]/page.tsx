@@ -20,6 +20,8 @@ interface PageProps {
   };
 }
 
+export const dynamic = "force-dynamic";
+
 export default async function ProductVariantPage({
   params: { productSlug, variantSlug },
   searchParams: { size: sizeId },

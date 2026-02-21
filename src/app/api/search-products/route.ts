@@ -1,6 +1,8 @@
 import client from "@/lib/elasticsearch";
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 // Define product type
 interface Product {
   name: string;

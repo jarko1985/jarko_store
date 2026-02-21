@@ -7,6 +7,8 @@ import { Plus } from "lucide-react";
 import CategoryDetails from "@/components/dashboard/forms/category-details";
 import { columns } from "./columns";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminCategoriesPage() {
   // Fetching stores data from the database
   const categories = await getAllCategories();

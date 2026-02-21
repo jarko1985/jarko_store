@@ -3,6 +3,8 @@ import Header from "@/components/store/layout/header/header";
 import { Country } from "@/lib/types";
 import { cookies } from "next/headers";
 
+export const dynamic = "force-dynamic";
+
 export default function CartPage() {
   // Get cookies from the store
   const cookieStore = cookies();

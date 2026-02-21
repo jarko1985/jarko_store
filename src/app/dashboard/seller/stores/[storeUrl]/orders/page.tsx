@@ -6,6 +6,8 @@ import { getStoreCoupons } from "@/queries/coupon";
 import CouponDetails from "@/components/dashboard/forms/coupon-details";
 import { getStoreOrders } from "@/queries/store";
 
+export const dynamic = "force-dynamic";
+
 export default async function SellerOrdersPage({
   params,
 }: {

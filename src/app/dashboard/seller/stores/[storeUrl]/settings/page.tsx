@@ -3,6 +3,8 @@ import StoreDetails from "@/components/dashboard/forms/store-details";
 import { db } from "@/lib/db";
 import { redirect } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 export default async function SellerStoreSettingsPage({
   params,
 }: {

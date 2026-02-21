@@ -7,6 +7,8 @@ import {
 import { redirect } from "next/navigation";
 import { columns } from "./columns";
 
+export const dynamic = "force-dynamic";
+
 export default async function SellerStoreShippingPage({
   params,
 }: {

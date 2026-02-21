@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 // Clerk
 import { currentUser } from "@clerk/nextjs/server";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
   // Retrieve the current user information
   const user = await currentUser();

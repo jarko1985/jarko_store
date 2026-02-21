@@ -7,6 +7,8 @@ import StoreProducts from "@/components/store/store-page/store-products";
 import { FiltersQueryType } from "@/lib/types";
 import { getStorePageDetails } from "@/queries/store";
 
+export const dynamic = "force-dynamic";
+
 export default async function StorePage({
   params,
   searchParams,

@@ -1,6 +1,8 @@
 import FollowingContainer from "@/components/store/profile/following/container";
 import { getUserFollowedStores } from "@/queries/profile";
 
+export const dynamic = "force-dynamic";
+
 export default async function ProfileFollowingPage({
   params,
 }: {
