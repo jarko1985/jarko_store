@@ -1,8 +1,7 @@
 import { Webhook } from "svix";
 import { headers } from "next/headers";
-import { WebhookEvent, clerkClient } from "@clerk/nextjs/server";
-import { User } from "@prisma/client";
-import { db } from "@/lib/db";
+import { WebhookEvent } from "@clerk/nextjs/server";
+import type { User } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -68,6 +67,8 @@ export async function POST(req: Request) {
     if (!user) return;
 
     // Upsert user in the database (update if exists, create if not)
+    const { db } = await import("@/lib/db");
+    const { clerkClient } = await import("@clerk/nextjs/server");
     const dbUser = await db.user.upsert({
       where: {
         email: user.email,
@@ -96,6 +97,7 @@ export async function POST(req: Request) {
     const userId = JSON.parse(body).data.id;
 
     // Delete the user from the database based on the user ID
+    const { db } = await import("@/lib/db");
     await db.user.delete({
       where: {
         id: userId,
