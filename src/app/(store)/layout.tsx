@@ -4,6 +4,8 @@ import { ReactNode } from "react";
 // Toaster
 import { Toaster } from "react-hot-toast";
 
+export const dynamic = "force-dynamic";
+
 export default function StoreLayout({ children }: { children: ReactNode }) {
   return (
     <div>

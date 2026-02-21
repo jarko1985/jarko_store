@@ -12,6 +12,8 @@ import { currentUser } from "@clerk/nextjs/server";
 // DB
 import { db } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function SellerStoreDashboardLayout({
   children,
 }: {
