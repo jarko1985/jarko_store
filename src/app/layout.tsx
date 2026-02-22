@@ -39,8 +39,8 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider>
-      <html lang="en">
-        <body className={`${interFont.className} ${barlowFont.variable}`}>
+      <html lang="en" suppressHydrationWarning>
+        <body className={`${interFont.className} ${barlowFont.variable}`} suppressHydrationWarning>
           <ThemeProvider
             attribute="class"
             defaultTheme="light"

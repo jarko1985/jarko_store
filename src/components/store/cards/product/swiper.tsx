@@ -36,12 +36,13 @@ export default function ProductCardImageSwiper({
     >
       <Swiper ref={swiperRef} modules={[Autoplay]} autoplay={{ delay: 500 }}>
         {images.map((img) => (
-          <SwiperSlide>
+          <SwiperSlide key={img.id}>
             <Image
               src={img.url}
               alt=""
               width={400}
               height={400}
+              unoptimized
               className="block object-cover h-[200px] w-48 sm:w-52"
             />
           </SwiperSlide>

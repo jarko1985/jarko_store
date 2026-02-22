@@ -25,8 +25,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import slugify from "slugify";
 import { generateUniqueSlug } from "@/lib/utils";
 
-// Cookies
-import { getCookie } from "cookies-next";
+// Cookies (use Next.js native API - cookies-next has compatibility issues in server actions)
 import { cookies } from "next/headers";
 import { setMaxListeners } from "events";
 
@@ -455,7 +454,7 @@ export const getAllStoreProducts = async (storeUrl: string) => {
 };
 
 // Function: deleteProduct
-// Description: Deletes a product from the database.
+// Description: Deletes a product from the database along with its variants and related records.
 // Permission Level: Seller only
 // Parameters:
 //   - productId: The ID of the product to be deleted.
@@ -476,8 +475,56 @@ export const deleteProduct = async (productId: string) => {
   // Ensure product data is provided
   if (!productId) throw new Error("Please provide product id.");
 
-  // Delete product from the database
-  const response = await db.product.delete({ where: { id: productId } });
+  // Fetch product and variant IDs (verify ownership via store.userId)
+  const product = await db.product.findFirst({
+    where: {
+      id: productId,
+      store: { userId: user.id },
+    },
+    select: {
+      id: true,
+      variants: { select: { id: true }, orderBy: { id: "asc" } },
+    },
+  });
+
+  if (!product) throw new Error("Product not found or access denied.");
+
+  const variantIds = product.variants.map((v) => v.id);
+
+  // Delete in order to satisfy foreign key constraints:
+  // 1. Wishlist references Size - set sizeId to null for wishlist items using our sizes
+  // 2. Size, ProductVariantImage, Color (reference ProductVariant)
+  // 3. ProductVariant (references Product)
+  // 4. Review (references Product)
+  // 5. Product
+  const response = await db.$transaction(async (tx) => {
+    if (variantIds.length > 0) {
+      const sizes = await tx.size.findMany({
+        where: { productVariantId: { in: variantIds } },
+        select: { id: true },
+      });
+      const sizeIds = sizes.map((s) => s.id);
+      if (sizeIds.length > 0) {
+        await tx.wishlist.updateMany({
+          where: { sizeId: { in: sizeIds } },
+          data: { sizeId: null },
+        });
+      }
+      await tx.size.deleteMany({
+        where: { productVariantId: { in: variantIds } },
+      });
+      await tx.productVariantImage.deleteMany({
+        where: { productVariantId: { in: variantIds } },
+      });
+      await tx.color.deleteMany({
+        where: { productVariantId: { in: variantIds } },
+      });
+    }
+    await tx.productVariant.deleteMany({ where: { productId } });
+    await tx.review.deleteMany({ where: { productId } });
+    return tx.product.delete({ where: { id: productId } });
+  });
+
   return response;
 };
 
@@ -815,8 +862,6 @@ export const retrieveProductDetails = async (
     },
   });
 
-  console.log(product);
-
   if (!product) return null;
   // Get variants info
   const variantsInfo = await db.productVariant.findMany({
@@ -847,11 +892,16 @@ export const retrieveProductDetails = async (
   };
 };
 
-const getUserCountry = () => {
-  const userCountryCookie = getCookie("userCountry", { cookies }) || "";
-  const defaultCountry = { name: "United States", code: "US" };
-
+const getUserCountry = (): { name: string; code: string; city: string } => {
+  const defaultCountry = {
+    name: "United States",
+    code: "US",
+    city: "",
+  };
   try {
+    const cookieStore = cookies();
+    const userCountryCookie = cookieStore.get("userCountry")?.value || "";
+    if (!userCountryCookie) return defaultCountry;
     const parsedCountry = JSON.parse(userCountryCookie);
     if (
       parsedCountry &&
@@ -859,11 +909,16 @@ const getUserCountry = () => {
       "name" in parsedCountry &&
       "code" in parsedCountry
     ) {
-      return parsedCountry;
+      return {
+        name: String(parsedCountry.name),
+        code: String(parsedCountry.code),
+        city: parsedCountry.city != null ? String(parsedCountry.city) : "",
+      };
     }
     return defaultCountry;
   } catch (error) {
     console.error("Failed to parse userCountryCookie", error);
+    return defaultCountry;
   }
 };
 
@@ -1411,21 +1466,25 @@ export const getProductsByIds = async (
 };
 
 const incrementProductViews = async (productId: string) => {
-  const isProductAlreadyViewed = getCookie(`viewedProduct_${productId}`, {
-    cookies,
-  });
-  console.log("isProductAlreadyViewed", isProductAlreadyViewed);
+  try {
+    const cookieStore = cookies();
+    const isProductAlreadyViewed = cookieStore.get(
+      `viewedProduct_${productId}`
+    )?.value;
 
-  if (!isProductAlreadyViewed) {
-    await db.product.update({
-      where: {
-        id: productId,
-      },
-      data: {
-        views: {
-          increment: 1,
+    if (!isProductAlreadyViewed) {
+      await db.product.update({
+        where: {
+          id: productId,
         },
-      },
-    });
+        data: {
+          views: {
+            increment: 1,
+          },
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Failed to increment product views:", error);
   }
 };

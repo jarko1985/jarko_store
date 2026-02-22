@@ -45,7 +45,7 @@ import Link from "next/link";
 
 export const columns: ColumnDef<StoreProductType>[] = [
   {
-    accessorKey: "image",
+    accessorKey: "name",
     header: "",
     cell: ({ row }) => {
       return (
