@@ -32,6 +32,7 @@ import {
   FormMessage,
   FormDescription,
 } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,13 +45,6 @@ import { upsertSubCategory } from "@/queries/subCategory";
 import { v4 } from "uuid";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 interface SubCategoryDetailsProps {
   data?: SubCategory;
@@ -70,47 +64,60 @@ const SubCategoryDetails: FC<SubCategoryDetailsProps> = ({
     mode: "onChange", // Form validation mode
     resolver: zodResolver(SubCategoryFormSchema), // Resolver for form validation
     defaultValues: {
-      // Setting default form values from data (if available)
-      name: data?.name,
+      // Setting default form values from data (if available) - use empty strings for new to avoid undefined serialization
+      name: data?.name ?? "",
       image: data?.image ? [{ url: data?.image }] : [],
-      url: data?.url,
-      featured: data?.featured,
-      categoryId: data?.categoryId,
+      url: data?.url ?? "",
+      featured: data?.featured ?? false,
+      categoryId: data?.categoryId ?? "",
     },
   });
 
+  const { register, formState: { errors } } = form;
+
   // Loading status based on form submission
   const isLoading = form.formState.isSubmitting;
-
-  const formData = form.watch();
-  console.log("formData", formData);
 
   // Reset form values when data changes
   useEffect(() => {
     if (data) {
       form.reset({
-        name: data?.name,
-        image: [{ url: data?.image }],
-        url: data?.url,
-        featured: data?.featured,
+        name: data.name,
+        image: [{ url: data.image }],
+        url: data.url,
+        featured: data.featured,
         categoryId: data.categoryId,
       });
     }
   }, [data, form]);
 
-  // Submit handler for form submission
+  // Submit handler for form submission (mirrors category-details handleSubmit logic)
   const handleSubmit = async (
     values: z.infer<typeof SubCategoryFormSchema>
   ) => {
     try {
-      // Upserting category data
+      const name = String(values.name ?? "").trim();
+      const url = String(values.url ?? "").trim();
+      const imageUrl = values.image?.[0]?.url ?? "";
+      const categoryId = String(values.categoryId ?? "").trim();
+
+      if (!name || !url || !imageUrl || !categoryId) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "SubCategory name, URL, image, and category are required.",
+        });
+        return;
+      }
+
+      // Upserting subCategory data
       const response = await upsertSubCategory({
         id: data?.id ? data.id : v4(),
-        name: values.name,
-        image: values.image[0].url,
-        url: values.url,
-        featured: values.featured,
-        categoryId: values.categoryId,
+        name,
+        image: imageUrl,
+        url,
+        featured: values.featured ?? false,
+        categoryId,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -180,67 +187,55 @@ const SubCategoryDetails: FC<SubCategoryDetailsProps> = ({
                   </FormItem>
                 )}
               />
-              <FormField
-                disabled={isLoading}
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem className="flex-1">
-                    <FormLabel>SubCategory name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              <div className="space-y-2 flex-1">
+                <Label htmlFor="subcategory-name">SubCategory name</Label>
+                <Input
+                  id="subcategory-name"
+                  placeholder="Name"
+                  disabled={isLoading}
+                  {...register("name")}
+                />
+                {errors.name && (
+                  <p className="text-sm font-medium text-destructive">
+                    {errors.name.message}
+                  </p>
                 )}
-              />
-              <FormField
-                disabled={isLoading}
-                control={form.control}
-                name="url"
-                render={({ field }) => (
-                  <FormItem className="flex-1">
-                    <FormLabel>SubCategory url</FormLabel>
-                    <FormControl>
-                      <Input placeholder="/subCategory-url" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              </div>
+              <div className="space-y-2 flex-1">
+                <Label htmlFor="subcategory-url">SubCategory url</Label>
+                <Input
+                  id="subcategory-url"
+                  placeholder="/subCategory-url"
+                  disabled={isLoading}
+                  {...register("url")}
+                />
+                {errors.url && (
+                  <p className="text-sm font-medium text-destructive">
+                    {errors.url.message}
+                  </p>
                 )}
-              />
-              <FormField
-                disabled={isLoading}
-                control={form.control}
-                name="categoryId"
-                render={({ field }) => (
-                  <FormItem className="flex-1">
-                    <FormLabel>Category</FormLabel>
-                    <Select
-                      disabled={isLoading || categories.length == 0}
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue
-                            defaultValue={field.value}
-                            placeholder="Select a category"
-                          />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.id}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
+              </div>
+              <div className="space-y-2 flex-1">
+                <Label htmlFor="subcategory-category">Category</Label>
+                <select
+                  id="subcategory-category"
+                  disabled={isLoading || categories.length === 0}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  {...register("categoryId")}
+                >
+                  <option value="">Select a category</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.categoryId && (
+                  <p className="text-sm font-medium text-destructive">
+                    {errors.categoryId.message}
+                  </p>
                 )}
-              />
+              </div>
               <FormField
                 control={form.control}
                 name="featured"

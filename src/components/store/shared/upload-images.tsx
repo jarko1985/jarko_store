@@ -78,7 +78,10 @@ const ImageUploadStore: FC<ImageUploadProps> = ({
           </div>
         ))}
       </div>
-      <CldUploadWidget onSuccess={onUpload} uploadPreset="ufb48euh">
+      <CldUploadWidget
+        onSuccess={onUpload}
+        uploadPreset={process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || "ml_default"}
+      >
         {({ open }) => {
           const onClick = () => {
             open();

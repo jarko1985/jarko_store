@@ -32,40 +32,63 @@ export const upsertCategory = async (category: Category) => {
     // Ensure category data is provided
     if (!category) throw new Error("Please provide category data.");
 
+    // Build explicit category payload - only include defined values to avoid Prisma undefined issues
+    const categoryPayload = {
+      id: category.id,
+      name: category.name ?? "",
+      image: category.image ?? "",
+      url: category.url ?? "",
+      featured: category.featured ?? false,
+      createdAt: category.createdAt ?? new Date(),
+      updatedAt: category.updatedAt ?? new Date(),
+    };
+
+    if (!categoryPayload.name || !categoryPayload.url || !categoryPayload.image) {
+      throw new Error("Category name, URL, and image are required.");
+    }
+
     // Throw error if category with same name or URL already exists
     const existingCategory = await db.category.findFirst({
       where: {
         AND: [
           {
-            OR: [{ name: category.name }, { url: category.url }],
+            OR: [
+              { name: categoryPayload.name },
+              { url: categoryPayload.url },
+            ],
           },
           {
             NOT: {
-              id: category.id,
+              id: categoryPayload.id,
             },
           },
         ],
       },
     });
 
-    // Throw error if category with same name or URL already exists
     if (existingCategory) {
       let errorMessage = "";
-      if (existingCategory.name === category.name) {
+      if (existingCategory.name === categoryPayload.name) {
         errorMessage = "A category with the same name already exists";
-      } else if (existingCategory.url === category.url) {
+      } else if (existingCategory.url === categoryPayload.url) {
         errorMessage = "A category with the same URL already exists";
       }
       throw new Error(errorMessage);
     }
 
-    // Upsert category into the database
+    // Upsert category into the database - use explicit payload to avoid undefined
     const categoryDetails = await db.category.upsert({
       where: {
-        id: category.id,
+        id: categoryPayload.id,
       },
-      update: category,
-      create: category,
+      update: {
+        name: categoryPayload.name,
+        image: categoryPayload.image,
+        url: categoryPayload.url,
+        featured: categoryPayload.featured,
+        updatedAt: categoryPayload.updatedAt,
+      },
+      create: categoryPayload,
     });
     return categoryDetails;
   } catch (error) {

@@ -75,40 +75,59 @@ export const upsertOfferTag = async (offerTag: OfferTag) => {
     // Ensure offer tag data is provided
     if (!offerTag) throw new Error("Please provide offer tag data.");
 
+    // Build explicit offerTag payload - only include defined values to avoid Prisma undefined issues (mirrors upsertCategory)
+    const offerTagPayload = {
+      id: offerTag.id,
+      name: offerTag.name ?? "",
+      url: offerTag.url ?? "",
+      createdAt: offerTag.createdAt ?? new Date(),
+      updatedAt: offerTag.updatedAt ?? new Date(),
+    };
+
+    if (!offerTagPayload.name || !offerTagPayload.url) {
+      throw new Error("Offer tag name and URL are required.");
+    }
+
     // Throw error if offer tag with the same name or URL already exists
     const existingOfferTag = await db.offerTag.findFirst({
       where: {
         AND: [
           {
-            OR: [{ name: offerTag.name }, { url: offerTag.url }],
+            OR: [
+              { name: offerTagPayload.name },
+              { url: offerTagPayload.url },
+            ],
           },
           {
             NOT: {
-              id: offerTag.id,
+              id: offerTagPayload.id,
             },
           },
         ],
       },
     });
 
-    // Throw error if offer tag with the same name or URL already exists
     if (existingOfferTag) {
       let errorMessage = "";
-      if (existingOfferTag.name === offerTag.name) {
+      if (existingOfferTag.name === offerTagPayload.name) {
         errorMessage = "An offer tag with the same name already exists";
-      } else if (existingOfferTag.url === offerTag.url) {
+      } else if (existingOfferTag.url === offerTagPayload.url) {
         errorMessage = "An offer tag with the same URL already exists";
       }
       throw new Error(errorMessage);
     }
 
-    // Upsert offer tag into the database
+    // Upsert offer tag into the database - use explicit payload to avoid undefined
     const offerTagDetails = await db.offerTag.upsert({
       where: {
-        id: offerTag.id,
+        id: offerTagPayload.id,
       },
-      update: offerTag,
-      create: offerTag,
+      update: {
+        name: offerTagPayload.name,
+        url: offerTagPayload.url,
+        updatedAt: offerTagPayload.updatedAt,
+      },
+      create: offerTagPayload,
     });
     return offerTagDetails;
   } catch (error) {

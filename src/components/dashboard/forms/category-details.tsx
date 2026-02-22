@@ -32,6 +32,7 @@ import {
   FormMessage,
   FormDescription,
 } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,13 +60,15 @@ const CategoryDetails: FC<CategoryDetailsProps> = ({ data }) => {
     mode: "onChange", // Form validation mode
     resolver: zodResolver(CategoryFormSchema), // Resolver for form validation
     defaultValues: {
-      // Setting default form values from data (if available)
-      name: data?.name,
+      // Setting default form values from data (if available) - use empty strings for new to avoid undefined serialization
+      name: data?.name ?? "",
       image: data?.image ? [{ url: data?.image }] : [],
-      url: data?.url,
-      featured: data?.featured,
+      url: data?.url ?? "",
+      featured: data?.featured ?? false,
     },
   });
+
+  const { register, formState: { errors } } = form;
 
   // Loading status based on form submission
   const isLoading = form.formState.isSubmitting;
@@ -74,10 +77,10 @@ const CategoryDetails: FC<CategoryDetailsProps> = ({ data }) => {
   useEffect(() => {
     if (data) {
       form.reset({
-        name: data?.name,
-        image: [{ url: data?.image }],
-        url: data?.url,
-        featured: data?.featured,
+        name: data.name,
+        image: [{ url: data.image }],
+        url: data.url,
+        featured: data.featured,
       });
     }
   }, [data, form]);
@@ -85,13 +88,26 @@ const CategoryDetails: FC<CategoryDetailsProps> = ({ data }) => {
   // Submit handler for form submission
   const handleSubmit = async (values: z.infer<typeof CategoryFormSchema>) => {
     try {
+      const name = String(values.name ?? "").trim();
+      const url = String(values.url ?? "").trim();
+      const imageUrl = values.image?.[0]?.url ?? "";
+
+      if (!name || !url || !imageUrl) {
+        toast({
+          variant: "destructive",
+          title: "Validation Error",
+          description: "Name, URL, and image are required.",
+        });
+        return;
+      }
+
       // Upserting category data
       const response = await upsertCategory({
         id: data?.id ? data.id : v4(),
-        name: values.name,
-        image: values.image[0].url,
-        url: values.url,
-        featured: values.featured,
+        name,
+        image: imageUrl,
+        url,
+        featured: values.featured ?? false,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -161,34 +177,34 @@ const CategoryDetails: FC<CategoryDetailsProps> = ({ data }) => {
                   </FormItem>
                 )}
               />
-              <FormField
-                disabled={isLoading}
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem className="flex-1">
-                    <FormLabel>Category name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              <div className="space-y-2 flex-1">
+                <Label htmlFor="category-name">Category name</Label>
+                <Input
+                  id="category-name"
+                  placeholder="Name"
+                  disabled={isLoading}
+                  {...register("name")}
+                />
+                {errors.name && (
+                  <p className="text-sm font-medium text-destructive">
+                    {errors.name.message}
+                  </p>
                 )}
-              />
-              <FormField
-                disabled={isLoading}
-                control={form.control}
-                name="url"
-                render={({ field }) => (
-                  <FormItem className="flex-1">
-                    <FormLabel>Category url</FormLabel>
-                    <FormControl>
-                      <Input placeholder="/category-url" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              </div>
+              <div className="space-y-2 flex-1">
+                <Label htmlFor="category-url">Category url</Label>
+                <Input
+                  id="category-url"
+                  placeholder="/category-url"
+                  disabled={isLoading}
+                  {...register("url")}
+                />
+                {errors.url && (
+                  <p className="text-sm font-medium text-destructive">
+                    {errors.url.message}
+                  </p>
                 )}
-              />
+              </div>
               <FormField
                 control={form.control}
                 name="featured"

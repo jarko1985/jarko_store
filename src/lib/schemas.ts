@@ -62,7 +62,7 @@ export const SubCategoryFormSchema = z.object({
       message:
         "Only letters, numbers, hyphen, and underscore are allowed in the subCategory url, and consecutive occurrences of hyphens, underscores, or spaces are not permitted.",
     }),
-  categoryId: z.string().uuid(),
+  categoryId: z.string().min(1, "Please select a category").uuid("Please select a valid category"),
   featured: z.boolean().default(false),
 });
 

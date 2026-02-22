@@ -32,40 +32,65 @@ export const upsertSubCategory = async (subCategory: SubCategory) => {
     // Ensure SubCategory data is provided
     if (!subCategory) throw new Error("Please provide subCategory data.");
 
-    // Throw error if category with same name or URL already exists
+    // Build explicit subCategory payload - only include defined values to avoid Prisma undefined issues (mirrors upsertCategory)
+    const subCategoryPayload = {
+      id: subCategory.id,
+      name: subCategory.name ?? "",
+      image: subCategory.image ?? "",
+      url: subCategory.url ?? "",
+      featured: subCategory.featured ?? false,
+      categoryId: subCategory.categoryId ?? "",
+      createdAt: subCategory.createdAt ?? new Date(),
+      updatedAt: subCategory.updatedAt ?? new Date(),
+    };
+
+    if (!subCategoryPayload.name || !subCategoryPayload.url || !subCategoryPayload.image || !subCategoryPayload.categoryId) {
+      throw new Error("SubCategory name, URL, image, and category are required.");
+    }
+
+    // Throw error if subCategory with same name or URL already exists
     const existingSubCategory = await db.subCategory.findFirst({
       where: {
         AND: [
           {
-            OR: [{ name: subCategory.name }, { url: subCategory.url }],
+            OR: [
+              { name: subCategoryPayload.name },
+              { url: subCategoryPayload.url },
+            ],
           },
           {
             NOT: {
-              id: subCategory.id,
+              id: subCategoryPayload.id,
             },
           },
         ],
       },
     });
 
-    // Throw error if category with same name or URL already exists
     if (existingSubCategory) {
       let errorMessage = "";
-      if (existingSubCategory.name === subCategory.name) {
+      if (existingSubCategory.name === subCategoryPayload.name) {
         errorMessage = "A SubCategory with the same name already exists";
-      } else if (existingSubCategory.url === subCategory.url) {
+      } else if (existingSubCategory.url === subCategoryPayload.url) {
         errorMessage = "A SubCategory with the same URL already exists";
       }
       throw new Error(errorMessage);
     }
 
-    // Upsert SubCategory into the database
+    // Upsert SubCategory into the database - use explicit payload to avoid undefined
     const subCategoryDetails = await db.subCategory.upsert({
       where: {
-        id: subCategory.id,
+        id: subCategoryPayload.id,
       },
-      update: subCategory,
-      create: subCategory,
+      update: {
+        name: subCategoryPayload.name,
+        image: subCategoryPayload.image,
+        url: subCategoryPayload.url,
+        featured: subCategoryPayload.featured,
+        categoryId: subCategoryPayload.categoryId,
+        updatedAt: subCategoryPayload.updatedAt,
+      },
+      create: subCategoryPayload,
     });
     return subCategoryDetails;
   } catch (error) {
