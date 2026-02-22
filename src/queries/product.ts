@@ -57,6 +57,57 @@ export const upsertProduct = async (
     // Ensure product data is provided
     if (!product) throw new Error("Please provide product data.");
 
+    // Build explicit product payload - only include defined values to avoid Prisma undefined issues (mirrors upsertCategory)
+    // Use variantDescription as fallback for description when description is empty (JoditEditor sync issue or user only filled variant tab)
+    const rawDescription = (product.description ?? "").trim();
+    const rawVariantDescription = (product.variantDescription ?? "").trim();
+    const productPayload: ProductWithVariantType = {
+      productId: product.productId,
+      variantId: product.variantId,
+      name: product.name ?? "",
+      description: rawDescription || rawVariantDescription || "",
+      variantName: product.variantName ?? "",
+      variantDescription: rawVariantDescription || rawDescription || "",
+      variantImage: product.variantImage ?? "",
+      images: product.images ?? [],
+      categoryId: product.categoryId ?? "",
+      subCategoryId: product.subCategoryId ?? "",
+      offerTagId: product.offerTagId ?? "",
+      brand: product.brand ?? "",
+      sku: product.sku ?? "",
+      weight: product.weight ?? 0.01,
+      colors: product.colors ?? [],
+      sizes: product.sizes ?? [],
+      product_specs: product.product_specs ?? [],
+      variant_specs: product.variant_specs ?? [],
+      keywords: product.keywords ?? [],
+      questions: product.questions ?? [],
+      isSale: product.isSale ?? false,
+      saleEndDate: product.saleEndDate ?? "",
+      freeShippingForAllCountries: product.freeShippingForAllCountries ?? false,
+      freeShippingCountriesIds: product.freeShippingCountriesIds ?? [],
+      shippingFeeMethod: product.shippingFeeMethod ?? "ITEM",
+      createdAt: product.createdAt ?? new Date(),
+      updatedAt: product.updatedAt ?? new Date(),
+    };
+
+    if (
+      !productPayload.name ||
+      !productPayload.description ||
+      !productPayload.variantName ||
+      !productPayload.variantImage ||
+      !productPayload.categoryId ||
+      !productPayload.subCategoryId ||
+      !productPayload.brand ||
+      !productPayload.sku ||
+      !productPayload.images?.length ||
+      productPayload.images.length < 3
+    ) {
+      throw new Error(
+        "Product name, description, variant name, variant image, category, subcategory, brand, SKU, and at least 3 product images are required."
+      );
+    }
+
     // Find the store by URL
     const store = await db.store.findUnique({
       where: { url: storeUrl, userId: user.id },
@@ -75,14 +126,14 @@ export const upsertProduct = async (
 
     if (existingProduct) {
       if (existingVariant) {
-        // Update existing variant and product
+        // Update existing variant and product - TODO: implement update logic
       } else {
         // Create new variant
-        await handleCreateVariant(product);
+        await handleCreateVariant(productPayload);
       }
     } else {
       // Create new product and variant
-      await handleProductCreate(product, store.id);
+      await handleProductCreate(productPayload, store.id);
     }
   } catch (error) {
     console.log(error);
@@ -121,7 +172,9 @@ const handleProductCreate = async (
     store: { connect: { id: storeId } },
     category: { connect: { id: product.categoryId } },
     subCategory: { connect: { id: product.subCategoryId } },
-    offerTag: { connect: { id: product.offerTagId } },
+    ...(product.offerTagId && {
+      offerTag: { connect: { id: product.offerTagId } },
+    }),
     brand: product.brand,
     specs: {
       create: product.product_specs.map((spec) => ({

@@ -7,8 +7,6 @@ import { currentUser } from "@clerk/nextjs/server";
 // DB
 import { db } from "@/lib/db";
 
-export const dynamic = "force-dynamic";
-
 export default async function SellerDashboardPage() {
   // Fetch the current user. If the user is not authenticated, redirect them to the home page.
   const user = await currentUser();

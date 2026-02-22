@@ -3,8 +3,6 @@ import { db } from "@/lib/db";
 import { getAllCategories } from "@/queries/category";
 import { getAllOfferTags } from "@/queries/offer-tag";
 
-export const dynamic = "force-dynamic";
-
 export default async function SellerNewProductPage({
   params,
 }: {

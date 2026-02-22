@@ -49,54 +49,81 @@ export const upsertStore = async (
     // Ensure store data is provided
     if (!store) throw new Error("Please provide store data.");
 
-    // Check if store with same name, email,url, or phone number already exists
+    // Build explicit store payload - only include defined values to avoid Prisma undefined issues (mirrors upsertCategory)
+    const storePayload = {
+      id: store.id,
+      name: store.name ?? "",
+      description: store.description ?? "",
+      email: store.email ?? "",
+      phone: store.phone ?? "",
+      logo: store.logo ?? "",
+      cover: store.cover ?? "",
+      url: store.url ?? "",
+      featured: store.featured ?? false,
+      createdAt: store.createdAt ?? new Date(),
+      updatedAt: store.updatedAt ?? new Date(),
+    };
+
+    if (!storePayload.name || !storePayload.description || !storePayload.email || !storePayload.phone || !storePayload.logo || !storePayload.cover || !storePayload.url) {
+      throw new Error("Store name, description, email, phone, logo, cover, and URL are required.");
+    }
+
+    // Check if store with same name, email, url, or phone number already exists
     const existingStore = await db.store.findFirst({
       where: {
         AND: [
           {
             OR: [
-              { name: store.name },
-              { email: store.email },
-              { phone: store.phone },
-              { url: store.url },
+              { name: storePayload.name },
+              { email: storePayload.email },
+              { phone: storePayload.phone },
+              { url: storePayload.url },
             ],
           },
           {
             NOT: {
-              id: store.id,
+              id: storePayload.id,
             },
           },
         ],
       },
     });
 
-    // If a store with same name, email, or phone number already exists, throw an error
     if (existingStore) {
       let errorMessage = "";
-      if (existingStore.name === store.name) {
+      if (existingStore.name === storePayload.name) {
         errorMessage = "A store with the same name already exists";
-      } else if (existingStore.email === store.email) {
+      } else if (existingStore.email === storePayload.email) {
         errorMessage = "A store with the same email already exists";
-      } else if (existingStore.phone === store.phone) {
+      } else if (existingStore.phone === storePayload.phone) {
         errorMessage = "A store with the same phone number already exists";
-      } else if (existingStore.url === store.url) {
+      } else if (existingStore.url === storePayload.url) {
         errorMessage = "A store with the same URL already exists";
       }
       throw new Error(errorMessage);
     }
 
-    // Upsert store details into the database
+    // Upsert store details into the database - use explicit payload to avoid undefined
     const storeDetails = await db.store.upsert({
       where: {
-        id: store.id,
+        id: storePayload.id,
       },
-      update: store,
+      update: {
+        name: storePayload.name,
+        description: storePayload.description,
+        email: storePayload.email,
+        phone: storePayload.phone,
+        logo: storePayload.logo,
+        cover: storePayload.cover,
+        url: storePayload.url,
+        featured: storePayload.featured,
+        updatedAt: storePayload.updatedAt,
+      },
       create: {
-        ...store,
-        status: store.status ?? StoreStatus.PENDING,
+        ...storePayload,
+        status: (store.status as StoreStatus) ?? StoreStatus.PENDING,
         averageRating: store.averageRating ?? 0,
         numReviews: store.numReviews ?? 0,
-        featured: store.featured ?? false,
         returnPolicy: store.returnPolicy ?? "Return in 30 days.",
         defaultShippingService: store.defaultShippingService ?? "International Delivery",
         defaultShippingFeePerItem: store.defaultShippingFeePerItem ?? 0,
@@ -186,6 +213,32 @@ export const updateStoreDefaultShippingDetails = async (
     if (!details) {
       throw new Error("No shipping details provided to update.");
     }
+
+    // Build explicit payload with fallbacks to avoid undefined serialization
+    const defaultShippingService = String(details.defaultShippingService ?? "").trim();
+    const returnPolicy = String(details.returnPolicy ?? "").trim();
+    if (!defaultShippingService || !returnPolicy) {
+      throw new Error("Shipping service name and return policy are required.");
+    }
+
+    const feePerItem = Number(details.defaultShippingFeePerItem);
+    const feeForAdditional = Number(details.defaultShippingFeeForAdditionalItem);
+    const feePerKg = Number(details.defaultShippingFeePerKg);
+    const feeFixed = Number(details.defaultShippingFeeFixed);
+    const deliveryMin = Math.round(Number(details.defaultDeliveryTimeMin) ?? 7);
+    const deliveryMax = Math.round(Number(details.defaultDeliveryTimeMax) ?? 31);
+
+    const updateData = {
+      defaultShippingService,
+      returnPolicy,
+      defaultShippingFeePerItem: Number.isNaN(feePerItem) ? 0 : Math.max(0, feePerItem),
+      defaultShippingFeeForAdditionalItem: Number.isNaN(feeForAdditional) ? 0 : Math.max(0, feeForAdditional),
+      defaultShippingFeePerKg: Number.isNaN(feePerKg) ? 0 : Math.max(0, feePerKg),
+      defaultShippingFeeFixed: Number.isNaN(feeFixed) ? 0 : Math.max(0, feeFixed),
+      defaultDeliveryTimeMin: Number.isNaN(deliveryMin) ? 7 : Math.max(1, deliveryMin),
+      defaultDeliveryTimeMax: Number.isNaN(deliveryMax) ? 31 : Math.max(1, deliveryMax),
+    };
+
     // Make sure seller is updating their own store
     const check_ownership = await db.store.findUnique({
       where: {
@@ -205,7 +258,7 @@ export const updateStoreDefaultShippingDetails = async (
         url: storeUrl,
         userId: user.id,
       },
-      data: details,
+      data: updateData,
     });
 
     return updatedStore;

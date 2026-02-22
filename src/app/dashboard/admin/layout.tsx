@@ -11,7 +11,7 @@ import Header from "@/components/dashboard/header/header";
 // Sidebar
 import Sidebar from "@/components/dashboard/sidebar/sidebar";
 
-export const dynamic = "force-dynamic";
+
 
 export default async function AdminDashboardLayout({
   children,

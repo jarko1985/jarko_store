@@ -31,6 +31,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -41,14 +42,20 @@ import { upsertCoupon } from "@/queries/coupon";
 import { v4 } from "uuid";
 import { useToast } from "@/components/ui/use-toast";
 import { useRouter } from "next/navigation";
-import { format } from "date-fns";
-import { NumberInput } from "@tremor/react";
 
-// Date time picker
-import DateTimePicker from "react-datetime-picker";
-import "react-datetime-picker/dist/DateTimePicker.css";
-import "react-calendar/dist/Calendar.css";
-import "react-clock/dist/Clock.css";
+// Helper: format for datetime-local input (YYYY-MM-DDTHH:mm) and storage (YYYY-MM-DDTHH:mm:ss)
+const toDateTimeLocal = (value: string | Date | undefined): string => {
+  if (!value) return "";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+const toStorageFormat = (value: string): string => {
+  if (!value) return "";
+  // datetime-local returns YYYY-MM-DDTHH:mm, append :00 for seconds
+  return value.length === 16 ? `${value}:00` : value;
+};
 
 interface CouponDetailsProps {
   data?: Coupon;
@@ -61,39 +68,58 @@ const CouponDetails: FC<CouponDetailsProps> = ({ data, storeUrl }) => {
   const router = useRouter(); // Hook for routing
 
   // Form hook for managing form state and validation
+  const now = new Date();
+  const defaultStart = toDateTimeLocal(now);
+  const defaultEnd = toDateTimeLocal(new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)); // +30 days
+
   const form = useForm<z.infer<typeof CouponFormSchema>>({
-    mode: "onChange", // Form validation mode
+    mode: "onSubmit", // Validate on submit - ensures zod runs before handleSubmit
     resolver: zodResolver(CouponFormSchema), // Resolver for form validation
     defaultValues: {
-      // Setting default form values from data (if available)
-      code: data?.code,
-      discount: data?.discount,
-      startDate: data?.startDate || format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
-      endDate: data?.endDate || format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
+      // Setting default form values from data (if available) - datetime-local format (YYYY-MM-DDTHH:mm)
+      code: data?.code ?? "",
+      discount: data?.discount ?? 1,
+      startDate: data?.startDate ? toDateTimeLocal(data.startDate) : defaultStart,
+      endDate: data?.endDate ? toDateTimeLocal(data.endDate) : defaultEnd,
     },
   });
+
+  const { register, formState: { errors } } = form;
 
   // Loading status based on form submission
   const isLoading = form.formState.isSubmitting;
 
-  // Reset form values when data changes
+  // Reset form values when data changes (normalize to datetime-local format)
   useEffect(() => {
     if (data) {
-      form.reset(data);
+      form.reset({
+        code: data.code,
+        discount: data.discount,
+        startDate: toDateTimeLocal(data.startDate),
+        endDate: toDateTimeLocal(data.endDate),
+      });
     }
   }, [data, form]);
 
-  // Submit handler for form submission
+  // Submit handler for form submission (mirrors category-details handleSubmit logic)
   const handleSubmit = async (values: z.infer<typeof CouponFormSchema>) => {
     try {
-      // Upserting category data
+      const code = String(values.code ?? "").trim();
+      const discountNum = Number(values.discount);
+      const discount = Number.isNaN(discountNum) || discountNum < 1 || discountNum > 99
+        ? 1
+        : Math.round(discountNum);
+      const startDate = toStorageFormat(values.startDate || defaultStart);
+      const endDate = toStorageFormat(values.endDate || defaultEnd);
+
+      // Upserting coupon data
       const response = await upsertCoupon(
         {
           id: data?.id ? data.id : v4(),
-          code: values.code,
-          discount: values.discount,
-          startDate: values.startDate,
-          endDate: values.endDate,
+          code,
+          discount,
+          startDate,
+          endDate,
           storeId: "",
           createdAt: new Date(),
           updatedAt: new Date(),
@@ -139,85 +165,80 @@ const CouponDetails: FC<CouponDetailsProps> = ({ data, storeUrl }) => {
         <CardContent>
           <Form {...form}>
             <form
-              onSubmit={form.handleSubmit(handleSubmit)}
+              onSubmit={form.handleSubmit(handleSubmit, (errs) => {
+                toast({
+                  variant: "destructive",
+                  title: "Validation Error",
+                  description:
+                    Object.values(errs)
+                      .map((e) => e?.message)
+                      .filter(Boolean)
+                      .join(". ") || "Please check the form and fix the errors.",
+                });
+              })}
               className="space-y-4"
             >
-              <FormField
-                disabled={isLoading}
-                control={form.control}
-                name="code"
-                render={({ field }) => (
-                  <FormItem className="flex-1">
-                    <FormLabel>Coupon code</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Coupon" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              <div className="space-y-2 flex-1">
+                <Label htmlFor="coupon-code">Coupon code</Label>
+                <Input
+                  id="coupon-code"
+                  placeholder="Coupon"
+                  disabled={isLoading}
+                  {...register("code")}
+                />
+                {errors.code && (
+                  <p className="text-sm font-medium text-destructive">
+                    {errors.code.message}
+                  </p>
                 )}
-              />
-              <FormField
-                disabled={isLoading}
-                control={form.control}
-                name="discount"
-                render={({ field }) => (
-                  <FormItem className="flex-1">
-                    <FormLabel>Coupon discount</FormLabel>
-                    <FormControl>
-                      <NumberInput
-                        defaultValue={field.value}
-                        onValueChange={field.onChange}
-                        placeholder="%"
-                        min={1}
-                        className="!shadow-none rounded-md !text-sm"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              </div>
+              <div className="space-y-2 flex-1">
+                <Label htmlFor="coupon-discount">Coupon discount (%)</Label>
+                <Input
+                  id="coupon-discount"
+                  type="number"
+                  min={1}
+                  max={99}
+                  placeholder="1-99"
+                  disabled={isLoading}
+                  {...register("discount", { valueAsNumber: true })}
+                />
+                {errors.discount && (
+                  <p className="text-sm font-medium text-destructive">
+                    {errors.discount.message}
+                  </p>
                 )}
-              />
-              <FormField
-                disabled={isLoading}
-                control={form.control}
-                name="startDate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Start date</FormLabel>
-                    <FormControl>
-                      <DateTimePicker
-                        onChange={(date) => {
-                          field.onChange(
-                            date ? format(date, "yyyy-MM-dd'T'HH:mm:ss") : ""
-                          );
-                        }}
-                        value={field.value ? new Date(field.value) : null}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              </div>
+              <div className="space-y-2 flex-1">
+                <Label htmlFor="coupon-startdate">Start date</Label>
+                <Input
+                  id="coupon-startdate"
+                  type="datetime-local"
+                  disabled={isLoading}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  {...register("startDate")}
+                />
+                {errors.startDate && (
+                  <p className="text-sm font-medium text-destructive">
+                    {errors.startDate.message}
+                  </p>
                 )}
-              />
-              <FormField
-                disabled={isLoading}
-                control={form.control}
-                name="endDate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>End date</FormLabel>
-                    <FormControl>
-                      <DateTimePicker
-                        onChange={(date) => {
-                          field.onChange(
-                            date ? format(date, "yyyy-MM-dd'T'HH:mm:ss") : ""
-                          );
-                        }}
-                        value={field.value ? new Date(field.value) : null}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              </div>
+              <div className="space-y-2 flex-1">
+                <Label htmlFor="coupon-enddate">End date</Label>
+                <Input
+                  id="coupon-enddate"
+                  type="datetime-local"
+                  disabled={isLoading}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  {...register("endDate")}
+                />
+                {errors.endDate && (
+                  <p className="text-sm font-medium text-destructive">
+                    {errors.endDate.message}
+                  </p>
                 )}
-              />
+              </div>
 
               <Button type="submit" disabled={isLoading}>
                 {isLoading

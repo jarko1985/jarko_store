@@ -24,7 +24,6 @@ const barlowFont = Barlow({
   variable: "--font-barlow",
 });
 
-export const dynamic = "force-dynamic";
 
 // Metadata
 export const metadata: Metadata = {

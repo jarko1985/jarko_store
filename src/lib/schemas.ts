@@ -182,12 +182,9 @@ export const ProductFormSchema = z.object({
     })
     .uuid(),
   offerTagId: z
-    .string({
-      required_error: "Product offer tag ID is mandatory.",
-      invalid_type_error: "Product offer tag ID must be a valid UUID.",
-    })
-    .uuid()
-    .optional(),
+    .union([z.string().uuid(), z.literal("")])
+    .optional()
+    .transform((val) => (val === "" ? undefined : val)),
   brand: z
     .string({
       required_error: "Product brand is mandatory.",
@@ -345,13 +342,13 @@ export const StoreShippingFormSchema = z.object({
     })
     .min(2, "Shipping service name must be at least 2 characters long.")
     .max(50, { message: "Shipping service name cannot exceed 50 characters." }),
-  defaultShippingFeePerItem: z.number(),
-  defaultShippingFeeForAdditionalItem: z.number(),
-  defaultShippingFeePerKg: z.number(),
-  defaultShippingFeeFixed: z.number(),
-  defaultDeliveryTimeMin: z.number(),
-  defaultDeliveryTimeMax: z.number(),
-  returnPolicy: z.string(),
+  defaultShippingFeePerItem: z.coerce.number().min(0),
+  defaultShippingFeeForAdditionalItem: z.coerce.number().min(0),
+  defaultShippingFeePerKg: z.coerce.number().min(0),
+  defaultShippingFeeFixed: z.coerce.number().min(0),
+  defaultDeliveryTimeMin: z.coerce.number().int().min(1),
+  defaultDeliveryTimeMax: z.coerce.number().int().min(1),
+  returnPolicy: z.string().min(1, "Return policy is required."),
 });
 
 export const ShippingRateFormSchema = z.object({

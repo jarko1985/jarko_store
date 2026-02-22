@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 import { getStoreCoupons } from "@/queries/coupon";
 import CouponDetails from "@/components/dashboard/forms/coupon-details";
 
-export const dynamic = "force-dynamic";
+
 
 export default async function SellerCouponsPage({
   params,

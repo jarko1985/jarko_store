@@ -39,6 +39,7 @@ import {
   FormMessage,
   FormDescription,
 } from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -167,37 +168,38 @@ const ProductDetails: FC<ProductDetailsProps> = ({
 
   // Form hook for managing form state and validation
   const form = useForm<z.infer<typeof ProductFormSchema>>({
-    mode: "onChange", // Form validation mode
+    mode: "onSubmit", // Validate on submit - ensures zod runs before handleSubmit
     resolver: zodResolver(ProductFormSchema), // Resolver for form validation
     defaultValues: {
-      // Setting default form values from data (if available)
-      name: data?.name,
-      description: data?.description,
-      variantName: data?.variantName,
-      variantDescription: data?.variantDescription,
-      images: data?.images || [],
+      // Setting default form values from data (if available) - use empty strings/arrays for new to avoid undefined serialization
+      name: data?.name ?? "",
+      description: data?.description ?? "",
+      variantName: data?.variantName ?? "",
+      variantDescription: data?.variantDescription ?? "",
+      images: data?.images ?? [],
       variantImage: data?.variantImage ? [{ url: data.variantImage }] : [],
-      categoryId: data?.categoryId,
-      offerTagId: data?.offerTagId,
-      subCategoryId: data?.subCategoryId,
-      brand: data?.brand,
-      sku: data?.sku,
-      colors: data?.colors,
-      sizes: data?.sizes,
-      product_specs: data?.product_specs,
-      variant_specs: data?.variant_specs,
-      keywords: data?.keywords,
-      questions: data?.questions,
-      isSale: data?.isSale || false,
-      weight: data?.weight,
+      categoryId: data?.categoryId ?? "",
+      offerTagId: data?.offerTagId ?? "",
+      subCategoryId: data?.subCategoryId ?? "",
+      brand: data?.brand ?? "",
+      sku: data?.sku ?? "",
+      colors: data?.colors ?? [{ color: "" }],
+      sizes: data?.sizes ?? [{ size: "", quantity: 1, price: 0.01, discount: 0 }],
+      product_specs: data?.product_specs ?? [{ name: "", value: "" }],
+      variant_specs: data?.variant_specs ?? [{ name: "", value: "" }],
+      keywords: data?.keywords ?? [],
+      questions: data?.questions ?? [{ question: "", answer: "" }],
+      isSale: data?.isSale ?? false,
+      weight: data?.weight ?? 0.01,
       saleEndDate:
-        data?.saleEndDate || format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
-      freeShippingForAllCountries: data?.freeShippingForAllCountries,
-      freeShippingCountriesIds: data?.freeShippingCountriesIds || [],
-      shippingFeeMethod: data?.shippingFeeMethod,
+        data?.saleEndDate ?? format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
+      freeShippingForAllCountries: data?.freeShippingForAllCountries ?? false,
+      freeShippingCountriesIds: data?.freeShippingCountriesIds ?? [],
+      shippingFeeMethod: data?.shippingFeeMethod ?? "ITEM",
     },
   });
-  console.log("errors", form.formState.errors);
+
+  const { register } = form;
 
   const saleEndDate = form.getValues().saleEndDate || new Date().toISOString();
 
@@ -213,13 +215,15 @@ const ProductDetails: FC<ProductDetailsProps> = ({
   });
 
   // UseEffect to get subCategories when user pick/change a category
+  const categoryId = form.watch("categoryId");
   useEffect(() => {
     const getSubCategories = async () => {
-      const res = await getAllCategoriesForCategory(form.watch().categoryId);
+      const res = await getAllCategoriesForCategory(categoryId || "");
       setSubCategories(res);
+      if (!categoryId) form.setValue("subCategoryId", "");
     };
     getSubCategories();
-  }, [form.watch().categoryId]);
+  }, [categoryId, form]);
 
   // Extract errors state from form
   const errors = form.formState.errors;
@@ -237,37 +241,50 @@ const ProductDetails: FC<ProductDetailsProps> = ({
     }
   }, [data, form]);
 
-  // Submit handler for form submission
+  // Submit handler for form submission (mirrors category-details handleSubmit logic)
+  // Zod validation runs first - if we reach here, values are valid
   const handleSubmit = async (values: z.infer<typeof ProductFormSchema>) => {
     try {
+      const name = String(values.name ?? "").trim();
+      const description = String(values.description ?? "").trim();
+      const variantName = String(values.variantName ?? "").trim();
+      const variantDescription = String(values.variantDescription ?? "").trim();
+      const variantImageUrl = values.variantImage?.[0]?.url ?? "";
+      const categoryId = String(values.categoryId ?? "").trim();
+      const subCategoryId = String(values.subCategoryId ?? "").trim();
+      const brand = String(values.brand ?? "").trim();
+      const sku = String(values.sku ?? "").trim();
+      const images = values.images ?? [];
+      const weight = Number(values.weight) || 0.01;
+
       // Upserting product data
       const response = await upsertProduct(
         {
           productId: data?.productId ? data.productId : v4(),
           variantId: data?.variantId ? data.variantId : v4(),
-          name: values.name,
-          description: values.description,
-          variantName: values.variantName,
-          variantDescription: values.variantDescription || "",
-          images: values.images,
-          variantImage: values.variantImage[0].url,
-          categoryId: values.categoryId,
-          subCategoryId: values.subCategoryId,
-          offerTagId: values.offerTagId || "",
-          isSale: values.isSale,
-          saleEndDate: values.saleEndDate,
-          brand: values.brand,
-          sku: values.sku,
-          weight: values.weight,
-          colors: values.colors,
-          sizes: values.sizes,
-          product_specs: values.product_specs,
-          variant_specs: values.variant_specs,
-          keywords: values.keywords,
-          questions: values.questions,
-          shippingFeeMethod: values.shippingFeeMethod,
-          freeShippingForAllCountries: values.freeShippingForAllCountries,
-          freeShippingCountriesIds: values.freeShippingCountriesIds || [],
+          name,
+          description,
+          variantName,
+          variantDescription,
+          images,
+          variantImage: variantImageUrl,
+          categoryId,
+          subCategoryId,
+          offerTagId: values.offerTagId ?? "",
+          isSale: values.isSale ?? false,
+          saleEndDate: values.saleEndDate ?? "",
+          brand,
+          sku,
+          weight,
+          colors: values.colors ?? [],
+          sizes: values.sizes ?? [],
+          product_specs: values.product_specs ?? [],
+          variant_specs: values.variant_specs ?? [],
+          keywords: values.keywords ?? [],
+          questions: values.questions ?? [],
+          shippingFeeMethod: values.shippingFeeMethod ?? "ITEM",
+          freeShippingForAllCountries: values.freeShippingForAllCountries ?? false,
+          freeShippingCountriesIds: values.freeShippingCountriesIds ?? [],
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -361,7 +378,16 @@ const ProductDetails: FC<ProductDetailsProps> = ({
         <CardContent>
           <Form {...form}>
             <form
-              onSubmit={form.handleSubmit(handleSubmit)}
+              onSubmit={form.handleSubmit(handleSubmit, (errors) => {
+                toast({
+                  variant: "destructive",
+                  title: "Validation Error",
+                  description: Object.values(errors)
+                    .map((e) => e?.message)
+                    .filter(Boolean)
+                    .join(". ") || "Please check the form and fix the errors.",
+                });
+              })}
               className="space-y-4"
             >
               {/* Images - colors */}
@@ -432,33 +458,35 @@ const ProductDetails: FC<ProductDetailsProps> = ({
               <InputFieldset label="Name">
                 <div className="flex flex-col lg:flex-row gap-4">
                   {!isNewVariantPage && (
-                    <FormField
-                      disabled={isLoading}
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormControl>
-                            <Input placeholder="Product name" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+                    <div className="space-y-2 flex-1">
+                      <Label htmlFor="product-name">Product name</Label>
+                      <Input
+                        id="product-name"
+                        placeholder="Product name"
+                        disabled={isLoading}
+                        {...register("name")}
+                      />
+                      {errors.name && (
+                        <p className="text-sm font-medium text-destructive">
+                          {errors.name.message}
+                        </p>
                       )}
-                    />
+                    </div>
                   )}
-                  <FormField
-                    disabled={isLoading}
-                    control={form.control}
-                    name="variantName"
-                    render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormControl>
-                          <Input placeholder="Variant name" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+                  <div className="space-y-2 flex-1">
+                    <Label htmlFor="variant-name">Variant name</Label>
+                    <Input
+                      id="variant-name"
+                      placeholder="Variant name"
+                      disabled={isLoading}
+                      {...register("variantName")}
+                    />
+                    {errors.variantName && (
+                      <p className="text-sm font-medium text-destructive">
+                        {errors.variantName.message}
+                      </p>
                     )}
-                  />
+                  </div>
                 </div>
               </InputFieldset>
               {/* Product and variant description editors (tabs) */}
@@ -495,10 +523,8 @@ const ProductDetails: FC<ProductDetailsProps> = ({
                             <JoditEditor
                               ref={productDescEditor}
                               config={config}
-                              value={form.getValues().description}
-                              onChange={(content) => {
-                                form.setValue("description", content);
-                              }}
+                              value={field.value ?? ""}
+                              onChange={(content) => field.onChange(content)}
                             />
                           </FormControl>
                           <FormMessage />
@@ -517,10 +543,8 @@ const ProductDetails: FC<ProductDetailsProps> = ({
                             <JoditEditor
                               ref={variantDescEditor}
                               config={config}
-                              value={form.getValues().variantDescription || ""}
-                              onChange={(content) => {
-                                form.setValue("variantDescription", content);
-                              }}
+                              value={field.value ?? ""}
+                              onChange={(content) => field.onChange(content)}
                             />
                           </FormControl>
                           <FormMessage />
@@ -533,112 +557,74 @@ const ProductDetails: FC<ProductDetailsProps> = ({
               {/* Category - SubCategory - offer*/}
               {!isNewVariantPage && (
                 <InputFieldset label="Category">
-                  <div className="flex gap-4">
-                    <FormField
-                      disabled={isLoading}
-                      control={form.control}
-                      name="categoryId"
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <Select
-                            disabled={isLoading || categories.length == 0}
-                            onValueChange={field.onChange}
-                            value={field.value}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue
-                                  defaultValue={field.value}
-                                  placeholder="Select a category"
-                                />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {categories.map((category) => (
-                                <SelectItem
-                                  key={category.id}
-                                  value={category.id}
-                                >
-                                  {category.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
+                  <div className="flex gap-4 flex-wrap">
+                    <div className="space-y-2 flex-1 min-w-[200px]">
+                      <Label htmlFor="product-category">Category</Label>
+                      <select
+                        id="product-category"
+                        disabled={isLoading || categories.length === 0}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        {...register("categoryId")}
+                      >
+                        <option value="">Select a category</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.categoryId && (
+                        <p className="text-sm font-medium text-destructive">
+                          {errors.categoryId.message}
+                        </p>
                       )}
-                    />
-                    <FormField
-                      disabled={isLoading}
-                      control={form.control}
-                      name="subCategoryId"
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <Select
-                            disabled={
-                              isLoading ||
-                              categories.length == 0 ||
-                              !form.getValues().categoryId
-                            }
-                            onValueChange={field.onChange}
-                            value={field.value}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue
-                                  defaultValue={field.value}
-                                  placeholder="Select a sub-category"
-                                />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {subCategories.map((sub) => (
-                                <SelectItem key={sub.id} value={sub.id}>
-                                  {sub.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
+                    </div>
+                    <div className="space-y-2 flex-1 min-w-[200px]">
+                      <Label htmlFor="product-subcategory">Sub-category</Label>
+                      <select
+                        id="product-subcategory"
+                        disabled={
+                          isLoading ||
+                          subCategories.length === 0 ||
+                          !form.getValues("categoryId")
+                        }
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        {...register("subCategoryId")}
+                      >
+                        <option value="">Select a sub-category</option>
+                        {subCategories.map((sub) => (
+                          <option key={sub.id} value={sub.id}>
+                            {sub.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.subCategoryId && (
+                        <p className="text-sm font-medium text-destructive">
+                          {errors.subCategoryId.message}
+                        </p>
                       )}
-                    />
-                    {/* Offer Tag */}
-                    <FormField
-                      disabled={isLoading}
-                      control={form.control}
-                      name="offerTagId"
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <Select
-                            disabled={isLoading || categories.length == 0}
-                            onValueChange={field.onChange}
-                            value={field.value}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue
-                                  defaultValue={field.value}
-                                  placeholder="Select an offer"
-                                />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {offerTags &&
-                                offerTags.map((offer) => (
-                                  <SelectItem key={offer.id} value={offer.id}>
-                                    {offer.name}
-                                  </SelectItem>
-                                ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
+                    </div>
+                    <div className="space-y-2 flex-1 min-w-[200px]">
+                      <Label htmlFor="product-offertag">Offer tag</Label>
+                      <select
+                        id="product-offertag"
+                        disabled={isLoading || !offerTags?.length}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                        {...register("offerTagId")}
+                      >
+                        <option value="">Select an offer (optional)</option>
+                        {offerTags?.map((offer) => (
+                          <option key={offer.id} value={offer.id}>
+                            {offer.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.offerTagId && (
+                        <p className="text-sm font-medium text-destructive">
+                          {errors.offerTagId?.message}
+                        </p>
                       )}
-                    />
+                    </div>
                   </div>
                 </InputFieldset>
               )}
@@ -648,33 +634,35 @@ const ProductDetails: FC<ProductDetailsProps> = ({
               >
                 <div className="flex flex-col lg:flex-row gap-4">
                   {!isNewVariantPage && (
-                    <FormField
-                      disabled={isLoading}
-                      control={form.control}
-                      name="brand"
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormControl>
-                            <Input placeholder="Product brand" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+                    <div className="space-y-2 flex-1">
+                      <Label htmlFor="product-brand">Product brand</Label>
+                      <Input
+                        id="product-brand"
+                        placeholder="Product brand"
+                        disabled={isLoading}
+                        {...register("brand")}
+                      />
+                      {errors.brand && (
+                        <p className="text-sm font-medium text-destructive">
+                          {errors.brand.message}
+                        </p>
                       )}
-                    />
+                    </div>
                   )}
-                  <FormField
-                    disabled={isLoading}
-                    control={form.control}
-                    name="sku"
-                    render={({ field }) => (
-                      <FormItem className="flex-1">
-                        <FormControl>
-                          <Input placeholder="Product sku" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
+                  <div className="space-y-2 flex-1">
+                    <Label htmlFor="product-sku">Product sku</Label>
+                    <Input
+                      id="product-sku"
+                      placeholder="Product sku"
+                      disabled={isLoading}
+                      {...register("sku")}
+                    />
+                    {errors.sku && (
+                      <p className="text-sm font-medium text-destructive">
+                        {errors.sku.message}
+                      </p>
                     )}
-                  />
+                  </div>
                   <FormField
                     disabled={isLoading}
                     control={form.control}

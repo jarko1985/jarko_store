@@ -30,6 +30,30 @@ export const upsertCoupon = async (coupon: Coupon, storeUrl: string) => {
     if (!coupon) throw new Error("Please provide coupon data.");
     if (!storeUrl) throw new Error("Store URL is required.");
 
+    // Build explicit coupon payload - only include defined values to avoid Prisma undefined issues (mirrors upsertCategory)
+    const discountNum = Number(coupon.discount);
+    // Dates: client sends YYYY-MM-DDTHH:mm or YYYY-MM-DDTHH:mm:ss (local time)
+    const startDateStr = String(coupon.startDate ?? "").trim();
+    const endDateStr = String(coupon.endDate ?? "").trim();
+    const couponPayload = {
+      id: coupon.id,
+      code: (coupon.code ?? "").trim(),
+      discount: Number.isNaN(discountNum) || discountNum < 1 || discountNum > 99 ? 1 : Math.round(discountNum),
+      startDate: startDateStr || new Date().toISOString().slice(0, 19), // fallback: YYYY-MM-DDTHH:mm:ss
+      endDate: endDateStr || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19),
+      storeId: "", // Will be set from store lookup below
+      createdAt: coupon.createdAt ?? new Date(),
+      updatedAt: coupon.updatedAt ?? new Date(),
+    };
+
+    if (!couponPayload.code || !couponPayload.startDate || !couponPayload.endDate) {
+      throw new Error("Coupon code, start date, and end date are required.");
+    }
+
+    if (couponPayload.discount < 1 || couponPayload.discount > 99) {
+      throw new Error("Discount must be between 1 and 99.");
+    }
+
     // Retrieve store ID using storeUrl
     const store = await db.store.findUnique({
       where: { url: storeUrl },
@@ -41,11 +65,11 @@ export const upsertCoupon = async (coupon: Coupon, storeUrl: string) => {
     const existingCoupon = await db.coupon.findFirst({
       where: {
         AND: [
-          { code: coupon.code },
+          { code: couponPayload.code },
           { storeId: store.id },
           {
             NOT: {
-              id: coupon.id,
+              id: couponPayload.id,
             },
           },
         ],
@@ -58,13 +82,29 @@ export const upsertCoupon = async (coupon: Coupon, storeUrl: string) => {
       );
     }
 
-    // Upsert coupon into the database
+    // Upsert coupon into the database - use explicit payload to avoid undefined
     const couponDetails = await db.coupon.upsert({
       where: {
-        id: coupon.id,
+        id: couponPayload.id,
       },
-      update: { ...coupon, storeId: store.id },
-      create: { ...coupon, storeId: store.id },
+      update: {
+        code: couponPayload.code,
+        discount: Math.round(couponPayload.discount),
+        startDate: couponPayload.startDate,
+        endDate: couponPayload.endDate,
+        storeId: store.id,
+        updatedAt: couponPayload.updatedAt,
+      },
+      create: {
+        id: couponPayload.id,
+        code: couponPayload.code,
+        discount: Math.round(couponPayload.discount),
+        startDate: couponPayload.startDate,
+        endDate: couponPayload.endDate,
+        storeId: store.id,
+        createdAt: couponPayload.createdAt,
+        updatedAt: couponPayload.updatedAt,
+      },
     });
 
     return couponDetails;
